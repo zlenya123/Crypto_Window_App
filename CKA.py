@@ -1,11 +1,9 @@
-from PyQt5 import QtWidgets, QtCore, QtGui
+from PyQt5 import QtWidgets, QtCore
 from PyQt5.QtGui import QIcon
 from collections import Counter
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-import random
 
-# Таблицы вероятностей
 RUSSIAN_PROBABILITIES = {
     'о': 0.090, 'е': 0.072, 'а': 0.062, 'и': 0.062, 'н': 0.053,
     'т': 0.053, 'с': 0.045, 'р': 0.040, 'в': 0.038, 'л': 0.035,
@@ -13,7 +11,7 @@ RUSSIAN_PROBABILITIES = {
     'я': 0.018, 'ы': 0.016, 'з': 0.016, 'ь': 0.014, 'б': 0.014,
     'г': 0.013, 'ч': 0.012, 'й': 0.010, 'х': 0.009, 'ж': 0.007,
     'ю': 0.006, 'ш': 0.006, 'ц': 0.004, 'щ': 0.003, 'э': 0.003,
-    'ф': 0.002, 'ё': 0.001, 'ъ': 0.001  # Добавляем буквы 'ё' и 'ъ'
+    'ф': 0.002, 'ё': 0.001, 'ъ': 0.001 
 }
 
 ENGLISH_PROBABILITIES = {
@@ -25,36 +23,31 @@ ENGLISH_PROBABILITIES = {
     'z': 0.001
 }
 
-class HistogramWindow(QtWidgets.QDialog):
-    def __init__(self, freq_data):
+class HistogramWidget(QtWidgets.QDialog):
+    def __init__(self, freq_data, title):
         super().__init__()
-        self.setWindowTitle("Гистограмма")
-        self.setGeometry(150, 150, 800, 600)
-        self.setWindowModality(QtCore.Qt.ApplicationModal)
-        
+        self.setWindowModality(QtCore.Qt.WindowModal)
         self.figure = Figure(figsize=(8, 5))
         self.canvas = FigureCanvas(self.figure)
         layout = QtWidgets.QVBoxLayout()
         layout.addWidget(self.canvas)
         self.setLayout(layout)
 
-        self.plot_histogram(freq_data)
+        self.plot_histogram(freq_data, title)
 
-    def plot_histogram(self, freq_data):
+    def plot_histogram(self, freq_data, title):
         ax = self.figure.add_subplot(111)
         ax.clear()
         sorted_freq_data = dict(sorted(freq_data.items()))
         ax.bar(sorted_freq_data.keys(), sorted_freq_data.values(), color='skyblue')
-        ax.set_title('Частота символов')
+        ax.set_title(title)
         ax.set_xlabel('Символы')
         ax.set_ylabel('Частота (%)')
 
-        # Установка подписей оси X без поворота
         ax.set_xticks(range(len(sorted_freq_data)))
         ax.set_xticklabels(sorted_freq_data.keys(), rotation=0, ha='center')
         ax.tick_params(axis='x', which='both', labelsize=8)
 
-        # Автоматическая настройка макета
         self.figure.tight_layout()
 
         self.canvas.draw()
@@ -101,9 +94,8 @@ class SubstitutionTableWindow(QtWidgets.QDialog):
             item_original.setFlags(item_original.flags() & ~QtCore.Qt.ItemIsEditable)
             self.tableWidget.setItem(row, 0, item_original)
 
-            # Создаем QLineEdit для редактирования замены
             line_edit = QtWidgets.QLineEdit(self.substitution_table[char])
-            line_edit.setMaxLength(1)  # Разрешаем только один символ
+            line_edit.setMaxLength(1)
             line_edit.textChanged.connect(lambda text, row=row: self.on_text_changed(text, row))
             self.tableWidget.setCellWidget(row, 1, line_edit)
 
@@ -160,22 +152,18 @@ class FrequencyAnalysisDialog(QtWidgets.QDialog):
         self.setGeometry(100, 100, 500, 400)
         self.setWindowModality(QtCore.Qt.ApplicationModal)
 
-        # Текстовый ввод
         self.textEdit = QtWidgets.QTextEdit(self)
         self.textEdit.setGeometry(20, 20, 460, 80)
 
-        # Кнопки
         self.loadButton = QtWidgets.QPushButton("Загрузить из файла", self)
         self.loadButton.clicked.connect(self.load_from_file)
 
         self.clearButton = QtWidgets.QPushButton("Очистить", self)
         self.clearButton.clicked.connect(self.clear_text)
 
-        # Гистограмма
         self.plotButton = QtWidgets.QPushButton("Построить гистограмму", self)
         self.plotButton.clicked.connect(self.plot_histogram)
 
-        # Дополнительные кнопки
         self.ruSubstitutionButton = QtWidgets.QPushButton("Таблица замен (Русский)", self)
         self.ruSubstitutionButton.clicked.connect(lambda: self.open_substitution_table("ru"))
 
@@ -185,13 +173,9 @@ class FrequencyAnalysisDialog(QtWidgets.QDialog):
         self.decryptButton = QtWidgets.QPushButton("Дешифровать текст", self)
         self.decryptButton.clicked.connect(self.decrypt_text)
 
-        self.saveDecryptedButton = QtWidgets.QPushButton("Сохранить расшифрованный текст", self)
-        self.saveDecryptedButton.clicked.connect(self.save_decrypted_text)
-
         self.decryptedBrowser = QtWidgets.QTextBrowser(self)
-        self.decryptedBrowser.setPlaceholderText("Расшифрованный текст будет отображён здесь")
+        self.decryptedBrowser.setPlaceholderText("Дешифрованный текст будет отображён здесь")
 
-        # Макет
         layout = QtWidgets.QVBoxLayout()
         layout.addWidget(self.textEdit)
 
@@ -201,18 +185,17 @@ class FrequencyAnalysisDialog(QtWidgets.QDialog):
         buttonLayout.addWidget(self.plotButton, 1, 0, 1, 2)
         buttonLayout.addWidget(self.ruSubstitutionButton, 2, 0)
         buttonLayout.addWidget(self.enSubstitutionButton, 2, 1)
-        buttonLayout.addWidget(self.decryptButton, 3, 0)
-        buttonLayout.addWidget(self.saveDecryptedButton, 3, 1)
+        buttonLayout.addWidget(self.decryptButton, 3, 0, 1, 2)
         layout.addLayout(buttonLayout)
 
         layout.addWidget(self.decryptedBrowser)
 
         self.setLayout(layout)
 
-        self.freq_data = None
+        self.freq_data_ru = None
+        self.freq_data_en = None
         self.substitution_tables = {"ru": {}, "en": {}}
         self.available_chars = {"ru": set(), "en": set()}
-        self.decrypted_text = ""
 
     def load_from_file(self):
         options = QtWidgets.QFileDialog.Options()
@@ -224,9 +207,10 @@ class FrequencyAnalysisDialog(QtWidgets.QDialog):
     def clear_text(self):
         self.textEdit.clear()
         self.decryptedBrowser.clear()
-        self.freq_data = None
+        self.freq_data_ru = None
+        self.freq_data_en = None
+        self.substitution_tables = {"ru": {}, "en": {}}
         self.available_chars = {"ru": set(), "en": set()}
-        self.decrypted_text = ""
 
     def analyze_text(self):
         text = self.textEdit.toPlainText()
@@ -234,23 +218,29 @@ class FrequencyAnalysisDialog(QtWidgets.QDialog):
             QtWidgets.QMessageBox.warning(self, "Ошибка", "Введите текст для анализа")
             return
 
-        # Подсчет частоты, игнорируя пробелы и неалфавитные символы
         text_lower = text.lower()
-        text_filtered = ''.join([char for char in text_lower if char.isalpha() and (char in RUSSIAN_PROBABILITIES or char in ENGLISH_PROBABILITIES)])
-        freq = Counter(text_filtered)
-        total_chars = sum(freq.values())
+        text_filtered_ru = ''.join([char for char in text_lower if char.isalpha() and char in RUSSIAN_PROBABILITIES])
+        text_filtered_en = ''.join([char for char in text_lower if char.isalpha() and char in ENGLISH_PROBABILITIES])
 
-        self.freq_data = {char: round(count / total_chars * 100, 2) for char, count in freq.items()}
-
-        # Автоматическая генерация таблицы замен
-        if any(char in RUSSIAN_PROBABILITIES for char in text_lower):
+        if text_filtered_ru:
+            freq_ru = Counter(text_filtered_ru)
+            total_chars_ru = sum(freq_ru.values())
+            self.freq_data_ru = {char: round(count / total_chars_ru * 100, 2) for char, count in freq_ru.items()}
             self.generate_substitution_table("ru")
-        if any(char in ENGLISH_PROBABILITIES for char in text_lower):
+
+        if text_filtered_en:
+            freq_en = Counter(text_filtered_en)
+            total_chars_en = sum(freq_en.values())
+            self.freq_data_en = {char: round(count / total_chars_en * 100, 2) for char, count in freq_en.items()}
             self.generate_substitution_table("en")
 
     def generate_substitution_table(self, language):
         probabilities = RUSSIAN_PROBABILITIES if language == "ru" else ENGLISH_PROBABILITIES
-        sorted_chars_by_freq = sorted(self.freq_data, key=self.freq_data.get, reverse=True)
+        freq_data = self.freq_data_ru if language == "ru" else self.freq_data_en
+        if not freq_data:
+            return
+
+        sorted_chars_by_freq = sorted(freq_data, key=freq_data.get, reverse=True)
         sorted_chars_by_prob = sorted(probabilities, key=probabilities.get, reverse=True)
 
         substitution_table = {}
@@ -261,7 +251,6 @@ class FrequencyAnalysisDialog(QtWidgets.QDialog):
                 substitution_table[orig_char] = prob_char
                 available_chars.add(prob_char)
 
-        # Заполняем оставшиеся символы
         for orig_char in probabilities:
             if orig_char not in substitution_table:
                 for prob_char in sorted_chars_by_prob:
@@ -275,14 +264,35 @@ class FrequencyAnalysisDialog(QtWidgets.QDialog):
 
     def plot_histogram(self):
         self.analyze_text()
-        if not self.freq_data:
+
+        if not self.freq_data_ru and not self.freq_data_en:
+            QtWidgets.QMessageBox.warning(self, "Ошибка", "Текст не содержит русских или английских символов для анализа")
             return
 
-        self.hist_window = HistogramWindow(self.freq_data)
-        self.hist_window.exec_()
+        self.hist_window = QtWidgets.QDialog(self)
+        self.hist_window.setWindowTitle("Гистограммы")
+        self.hist_window.setGeometry(150, 150, 800, 600)
+
+        tab_widget = QtWidgets.QTabWidget(self.hist_window)
+
+        if self.freq_data_ru:
+            hist_widget_ru = HistogramWidget(self.freq_data_ru, "Гистограмма (Русский)")
+            tab_widget.addTab(hist_widget_ru, "Русский")
+
+        if self.freq_data_en:
+            hist_widget_en = HistogramWidget(self.freq_data_en, "Гистограмма (Английский)")
+            tab_widget.addTab(hist_widget_en, "Английский")
+
+        layout = QtWidgets.QVBoxLayout()
+        layout.addWidget(tab_widget)
+        self.hist_window.setLayout(layout)
+
+        self.hist_window.show()
 
     def open_substitution_table(self, language):
-        table_window = SubstitutionTableWindow(language, self.substitution_tables.get(language), self.available_chars.get(language))
+        substitution_table = self.substitution_tables.get(language)
+        available_chars = self.available_chars.get(language)
+        table_window = SubstitutionTableWindow(language, substitution_table, available_chars)
         if table_window.exec_():
             self.substitution_tables[language] = table_window.substitution_table
             self.available_chars[language] = table_window.available_chars
@@ -294,34 +304,28 @@ class FrequencyAnalysisDialog(QtWidgets.QDialog):
             return
 
         if not self.substitution_tables["ru"] and not self.substitution_tables["en"]:
-            QtWidgets.QMessageBox.warning(self, "Ошибка", "Сначала настройте таблицу замен!")
+            QtWidgets.QMessageBox.warning(self, "Ошибка", "Сначала постройте гистрограмму!")
             return
 
-        language = "ru" if self.substitution_tables["ru"] else "en"
-        substitution_table = self.substitution_tables[language]
-
-        # Сохранение регистра символов
         decrypted_text = []
+
         for char in encrypted_text:
-            if char.lower() in substitution_table:
+            lower_char = char.lower()
+            if lower_char in self.substitution_tables["ru"]:
+                language = "ru"
+            elif lower_char in self.substitution_tables["en"]:
+                language = "en"
+            else:
+                decrypted_text.append(char)
+                continue
+
+            substitution_table = self.substitution_tables[language]
+            if lower_char in substitution_table:
                 if char.isupper():
-                    decrypted_text.append(substitution_table[char.lower()].upper())
+                    decrypted_text.append(substitution_table[lower_char].upper())
                 else:
-                    decrypted_text.append(substitution_table[char.lower()])
+                    decrypted_text.append(substitution_table[lower_char])
             else:
                 decrypted_text.append(char)
 
-        self.decrypted_text = ''.join(decrypted_text)
-        self.decryptedBrowser.setText(self.decrypted_text)
-
-    def save_decrypted_text(self):
-        if not self.decrypted_text:
-            QtWidgets.QMessageBox.warning(self, "Ошибка", "Сначала дешифруйте текст!")
-            return
-
-        options = QtWidgets.QFileDialog.Options()
-        file_path, _ = QtWidgets.QFileDialog.getSaveFileName(self, "Сохранить файл", "", "Текстовые файлы (*.txt);;Все файлы (*)", options=options)
-        if file_path:
-            with open(file_path, 'w', encoding='utf-8') as file:
-                file.write(self.decrypted_text)
-            QtWidgets.QMessageBox.information(self, "Успех", "Расшифрованный текст сохранен!")
+        self.decryptedBrowser.setText(''.join(decrypted_text))
