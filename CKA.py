@@ -55,51 +55,66 @@ class HistogramWidget(QtWidgets.QDialog):
         self.canvas.draw()
 
 class SubstitutionTableWindow(QtWidgets.QDialog):
-    def __init__(self, language="ru", substitution_table=None, available_chars=None):
+    def __init__(self, language="ru", substitution_table=None, available_chars=None, freq_data=None):
         super().__init__()
         self.language = language
         self.setWindowTitle(f"Таблица замен ({'Русский' if language == 'ru' else 'Английский'})")
-        self.setGeometry(150, 150, 600, 400)
+        self.setGeometry(150, 150, 800, 400)
         self.setWindowModality(QtCore.Qt.ApplicationModal)
-
+        
+        # Создаем таблицу с 4 столбцами
         self.tableWidget = QtWidgets.QTableWidget(self)
-        self.tableWidget.setColumnCount(2)
-        self.tableWidget.setHorizontalHeaderLabels(["Исходный символ", "Замена"])
+        self.tableWidget.setColumnCount(4)
+        self.tableWidget.setHorizontalHeaderLabels(["Исходный символ", "Замена", "Частота (%)", "Теор. вероятность (%)"])
         self.tableWidget.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         self.tableWidget.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
         self.tableWidget.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
         self.tableWidget.setAlternatingRowColors(True)
         self.tableWidget.setSortingEnabled(True)
-
+        
         self.scrollArea = QtWidgets.QScrollArea(self)
         self.scrollArea.setWidgetResizable(True)
         self.scrollArea.setWidget(self.tableWidget)
-
+        
         self.saveButton = QtWidgets.QPushButton("Сохранить", self)
         self.saveButton.clicked.connect(self.save_table)
-
+        
         layout = QtWidgets.QVBoxLayout()
         layout.addWidget(self.scrollArea)
         layout.addWidget(self.saveButton)
         self.setLayout(layout)
-
+        
         self.available_chars = available_chars if available_chars else set()
+        self.freq_data = freq_data if freq_data else {}
         self.load_table(substitution_table)
 
     def load_table(self, substitution_table):
+        # Выбираем соответствующий словарь вероятностей
         probabilities = RUSSIAN_PROBABILITIES if self.language == "ru" else ENGLISH_PROBABILITIES
         self.substitution_table = substitution_table if substitution_table else {char: char for char in probabilities.keys()}
         self.tableWidget.setRowCount(len(probabilities))
-
+        
         for row, char in enumerate(sorted(probabilities.keys())):
             item_original = QtWidgets.QTableWidgetItem(char)
             item_original.setFlags(item_original.flags() & ~QtCore.Qt.ItemIsEditable)
             self.tableWidget.setItem(row, 0, item_original)
-
+            
             line_edit = QtWidgets.QLineEdit(self.substitution_table[char])
             line_edit.setMaxLength(1)
             line_edit.textChanged.connect(lambda text, row=row: self.on_text_changed(text, row))
             self.tableWidget.setCellWidget(row, 1, line_edit)
+            
+            freq = self.freq_data.get(char, 0)
+            item_freq = QtWidgets.QTableWidgetItem(f"{freq:.2f}" if freq else "-")
+            item_freq.setFlags(item_freq.flags() & ~QtCore.Qt.ItemIsEditable)
+            self.tableWidget.setItem(row, 2, item_freq)
+            
+            prob = probabilities[char] * 100  
+            item_prob = QtWidgets.QTableWidgetItem(f"{prob:.2f}")
+            item_prob.setFlags(item_prob.flags() & ~QtCore.Qt.ItemIsEditable)
+            self.tableWidget.setItem(row, 3, item_prob)
+        
+        self.tableWidget.resizeColumnsToContents()
 
     def on_text_changed(self, text, row):
         original_char = self.tableWidget.item(row, 0).text()
@@ -294,7 +309,8 @@ class FrequencyAnalysisDialog(QtWidgets.QDialog):
     def open_substitution_table(self, language):
         substitution_table = self.substitution_tables.get(language)
         available_chars = self.available_chars.get(language)
-        table_window = SubstitutionTableWindow(language, substitution_table, available_chars)
+        freq_data = self.freq_data_ru if language == "ru" else self.freq_data_en
+        table_window = SubstitutionTableWindow(language, substitution_table, available_chars, freq_data)
         if table_window.exec_():
             self.substitution_tables[language] = table_window.substitution_table
             self.available_chars[language] = table_window.available_chars
