@@ -3,6 +3,8 @@ from PyQt5.QtGui import QIcon
 from collections import Counter
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
+import docx
+import os
 
 RUSSIAN_PROBABILITIES = {
     'о': 0.090, 'е': 0.072, 'а': 0.062, 'и': 0.062, 'н': 0.053,
@@ -151,34 +153,28 @@ class FrequencyAnalysisDialog(QtWidgets.QDialog):
         self.setWindowTitle("Частотный анализ")
         self.setGeometry(100, 100, 500, 400)
         self.setWindowModality(QtCore.Qt.ApplicationModal)
-
         self.textEdit = QtWidgets.QTextEdit(self)
         self.textEdit.setGeometry(20, 20, 460, 80)
-
         self.loadButton = QtWidgets.QPushButton("Загрузить из файла", self)
         self.loadButton.clicked.connect(self.load_from_file)
-
         self.clearButton = QtWidgets.QPushButton("Очистить", self)
         self.clearButton.clicked.connect(self.clear_text)
-
         self.plotButton = QtWidgets.QPushButton("Построить гистограмму", self)
         self.plotButton.clicked.connect(self.plot_histogram)
-
         self.ruSubstitutionButton = QtWidgets.QPushButton("Таблица замен (Русский)", self)
         self.ruSubstitutionButton.clicked.connect(lambda: self.open_substitution_table("ru"))
-
         self.enSubstitutionButton = QtWidgets.QPushButton("Таблица замен (Английский)", self)
         self.enSubstitutionButton.clicked.connect(lambda: self.open_substitution_table("en"))
-
         self.decryptButton = QtWidgets.QPushButton("Дешифровать текст", self)
         self.decryptButton.clicked.connect(self.decrypt_text)
-
         self.decryptedBrowser = QtWidgets.QTextBrowser(self)
         self.decryptedBrowser.setPlaceholderText("Дешифрованный текст будет отображён здесь")
 
+        self.saveButton = QtWidgets.QPushButton("Сохранить", self)
+        self.saveButton.clicked.connect(self.save_decrypted_text)
+        
         layout = QtWidgets.QVBoxLayout()
         layout.addWidget(self.textEdit)
-
         buttonLayout = QtWidgets.QGridLayout()
         buttonLayout.addWidget(self.loadButton, 0, 0)
         buttonLayout.addWidget(self.clearButton, 0, 1)
@@ -186,12 +182,10 @@ class FrequencyAnalysisDialog(QtWidgets.QDialog):
         buttonLayout.addWidget(self.ruSubstitutionButton, 2, 0)
         buttonLayout.addWidget(self.enSubstitutionButton, 2, 1)
         buttonLayout.addWidget(self.decryptButton, 3, 0, 1, 2)
+        buttonLayout.addWidget(self.saveButton, 4, 0, 1, 2)
         layout.addLayout(buttonLayout)
-
         layout.addWidget(self.decryptedBrowser)
-
         self.setLayout(layout)
-
         self.freq_data_ru = None
         self.freq_data_en = None
         self.substitution_tables = {"ru": {}, "en": {}}
@@ -199,10 +193,18 @@ class FrequencyAnalysisDialog(QtWidgets.QDialog):
 
     def load_from_file(self):
         options = QtWidgets.QFileDialog.Options()
-        file_path, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Выбрать файл", "", "Текстовые файлы (*.txt);;Все файлы (*)", options=options)
+        file_path, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Выбрать файл", "", "Текстовые файлы (*.txt *.docx);;Все файлы (*)", options=options)
         if file_path:
-            with open(file_path, 'r', encoding='utf-8') as file:
-                self.textEdit.setText(file.read())
+            _, ext = os.path.splitext(file_path)
+            if ext.lower() == '.txt':
+                with open(file_path, 'r', encoding='utf-8') as file:
+                    self.textEdit.setText(file.read())
+            elif ext.lower() == '.docx':
+                doc = docx.Document(file_path)
+                full_text = []
+                for para in doc.paragraphs:
+                    full_text.append(para.text)
+                self.textEdit.setText(full_text)
 
     def clear_text(self):
         self.textEdit.clear()
@@ -329,3 +331,24 @@ class FrequencyAnalysisDialog(QtWidgets.QDialog):
                 decrypted_text.append(char)
 
         self.decryptedBrowser.setText(''.join(decrypted_text))
+
+    def save_decrypted_text(self):
+        decrypted_text = self.decryptedBrowser.toPlainText()
+        if not decrypted_text:
+            QtWidgets.QMessageBox.warning(self, "Ошибка", "Нет текста для сохранения")
+            return
+        options = QtWidgets.QFileDialog.Options()
+        file_path, selected_filter = QtWidgets.QFileDialog.getSaveFileName(self, "Сохранить файл", "", "Текстовые файлы (*.txt);;DOCX файлы (*.docx);;Все файлы (*)", options=options)
+        if file_path:
+            try:
+                _, ext = os.path.splitext(file_path)
+                if ext.lower() == '.txt':
+                    with open(file_path, 'w', encoding='utf-8') as file:
+                        file.write(decrypted_text)
+                elif ext.lower() == '.docx':
+                    doc = docx.Document()
+                    doc.add_paragraph(decrypted_text)
+                    doc.save(file_path)
+                QtWidgets.QMessageBox.information(self, "Успех", "Текст успешно сохранен!")
+            except Exception as e:
+                QtWidgets.QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить файл: {str(e)}")
