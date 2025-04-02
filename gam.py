@@ -1,5 +1,6 @@
 from PyQt5 import QtWidgets, QtCore, QtGui
 from PyQt5.QtGui import QIcon
+import base64
 import numpy as np
 
 class LinearCongruentialGenerator:
@@ -196,7 +197,7 @@ class GammaCipherDialog(QtWidgets.QDialog):
         if text:
             gamma = self.generate_gamma(len(text), seed)
             encrypted_text = self.xor_data(text, gamma)
-            self.textBrowser.setPlainText(encrypted_text.hex()) 
+            self.textBrowser.setPlainText(base64.b64encode(encrypted_text).decode('utf-8')) 
         elif file_path:
             with open(file_path, 'rb') as f:
                 data = f.read()
@@ -221,12 +222,12 @@ class GammaCipherDialog(QtWidgets.QDialog):
         seed = self.lcg_seed
         if text:
             try:
-                text_bytes = bytes.fromhex(text) 
+                text_bytes = base64.b64decode(text) 
                 gamma = self.generate_gamma(len(text_bytes), seed)
                 decrypted_text = self.xor_data(text_bytes, gamma)
                 self.textBrowser.setPlainText(decrypted_text.decode('utf-8', errors='ignore'))
             except ValueError:
-                self.show_error("Ошибка: некорректный ввод (ожидался HEX)")
+                self.show_error("Ошибка: некорректный ввод (ожидался Base64)")
         elif file_path:
             with open(file_path, 'rb') as f:
                 data = f.read()
