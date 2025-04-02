@@ -7,39 +7,68 @@ class CaesarCipherDialog(QtWidgets.QDialog):
         super().__init__()
         self.setWindowIcon(QIcon("icon.ico"))
         self.setWindowTitle("Шифр Цезаря")
-        self.setGeometry(100, 100, 500, 300)
+        self.resize(500, 300)
         self.setWindowModality(QtCore.Qt.ApplicationModal)
-        
+
+        main_layout = QtWidgets.QVBoxLayout()
+
+        title_label = QtWidgets.QLabel("Шифр Цезаря", self)
+        title_label.setAlignment(QtCore.Qt.AlignCenter)
+        main_layout.addWidget(title_label)
+
+        separator = QtWidgets.QFrame()
+        separator.setFrameShape(QtWidgets.QFrame.HLine)
+        separator.setFrameShadow(QtWidgets.QFrame.Sunken)
+        main_layout.addWidget(separator)
+
         self.label = QtWidgets.QLabel("Исходный текст:", self)
-        self.label.setGeometry(20, 0, 100, 20)
-        
+        main_layout.addWidget(self.label)
+
         self.textEdit = QtWidgets.QTextEdit(self)
-        self.textEdit.setGeometry(20, 20, 460, 80)
-        
+        main_layout.addWidget(self.textEdit)
+
         self.resultLabel = QtWidgets.QLabel("Результат:", self)
-        self.resultLabel.setGeometry(20, 100, 100, 20)
-        
+        main_layout.addWidget(self.resultLabel)
+
         self.textBrowser = QtWidgets.QTextBrowser(self)
-        self.textBrowser.setGeometry(20, 120, 460, 80)
-        
+        main_layout.addWidget(self.textBrowser)
+
+        shift_layout = QtWidgets.QHBoxLayout()
+
         self.shiftLabel = QtWidgets.QLabel("Сдвиг:", self)
-        self.shiftLabel.setGeometry(20, 220, 50, 30)
-        
+        shift_layout.addWidget(self.shiftLabel)
+
         self.spinBox = QtWidgets.QSpinBox(self)
-        self.spinBox.setGeometry(80, 220, 50, 30)
-        
+        shift_layout.addWidget(self.spinBox)
+
+        shift_layout.addStretch(1)
+        main_layout.addLayout(shift_layout)
+
+
+        button_layout = QtWidgets.QHBoxLayout()
+
+        button_layout.addStretch(1)
+
         self.encryptButton = QtWidgets.QPushButton("Шифровать", self)
-        self.encryptButton.setGeometry(150, 220, 100, 30)
         self.encryptButton.clicked.connect(self.encrypt_text)
-        
+        button_layout.addWidget(self.encryptButton)
+
+        button_layout.addSpacing(20)
+
         self.decryptButton = QtWidgets.QPushButton("Расшифровать", self)
-        self.decryptButton.setGeometry(260, 220, 100, 30)
         self.decryptButton.clicked.connect(self.decrypt_text)
-        
+        button_layout.addWidget(self.decryptButton)
+
+        button_layout.addSpacing(20)
+
         self.clearButton = QtWidgets.QPushButton("Очистить", self)
-        self.clearButton.setGeometry(370, 220, 100, 30)
         self.clearButton.clicked.connect(self.clear_text)
-    
+        button_layout.addWidget(self.clearButton)
+
+        button_layout.addStretch(1)
+        main_layout.addLayout(button_layout)
+        self.setLayout(main_layout)
+
     def caesar_cipher(self, text, shift):
         result = []
         for char in text:
@@ -51,13 +80,12 @@ class CaesarCipherDialog(QtWidgets.QDialog):
                 result.append(char)
         return "".join(result)
 
-    
     def encrypt_text(self):
         self.textBrowser.setPlainText(self.caesar_cipher(self.textEdit.toPlainText(), self.spinBox.value()))
-    
+
     def decrypt_text(self):
         self.textBrowser.setPlainText(self.caesar_cipher(self.textEdit.toPlainText(), -self.spinBox.value()))
-    
+
     def clear_text(self):
         self.textEdit.clear()
         self.textBrowser.clear()

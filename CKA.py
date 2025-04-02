@@ -59,7 +59,7 @@ class SubstitutionTableWindow(QtWidgets.QDialog):
         super().__init__()
         self.language = language
         self.setWindowTitle(f"Таблица замен ({'Русский' if language == 'ru' else 'Английский'})")
-        self.setGeometry(150, 150, 800, 400)
+        self.resize(600, 700)
         self.setWindowModality(QtCore.Qt.ApplicationModal)
         
         # Создаем таблицу с 4 столбцами
@@ -166,7 +166,7 @@ class FrequencyAnalysisDialog(QtWidgets.QDialog):
         super().__init__()
         self.setWindowIcon(QIcon("icon.ico"))
         self.setWindowTitle("Частотный анализ")
-        self.setGeometry(100, 100, 500, 400)
+        self.resize(500, 400)
         self.setWindowModality(QtCore.Qt.ApplicationModal)
         self.textEdit = QtWidgets.QTextEdit(self)
         self.textEdit.setGeometry(20, 20, 460, 80)
@@ -231,9 +231,6 @@ class FrequencyAnalysisDialog(QtWidgets.QDialog):
 
     def analyze_text(self):
         text = self.textEdit.toPlainText()
-        if not text:
-            QtWidgets.QMessageBox.warning(self, "Ошибка", "Введите текст для анализа")
-            return
 
         text_lower = text.lower()
         text_filtered_ru = ''.join([char for char in text_lower if char.isalpha() and char in RUSSIAN_PROBABILITIES])
@@ -368,3 +365,11 @@ class FrequencyAnalysisDialog(QtWidgets.QDialog):
                 QtWidgets.QMessageBox.information(self, "Успех", "Текст успешно сохранен!")
             except Exception as e:
                 QtWidgets.QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить файл: {str(e)}")
+
+
+if __name__ == "__main__":
+    import sys
+    app = QtWidgets.QApplication(sys.argv)
+    dialog = FrequencyAnalysisDialog()
+    dialog.show()
+    sys.exit(app.exec_())

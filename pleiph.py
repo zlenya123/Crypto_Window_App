@@ -7,39 +7,60 @@ class PlayfairCipherDialog(QtWidgets.QDialog):
         super().__init__()
         self.setWindowIcon(QIcon("icon.ico"))
         self.setWindowTitle("Шифр Плейфера")
-        self.setGeometry(100, 100, 500, 380)
+        self.resize(500, 300)
         self.setWindowModality(QtCore.Qt.ApplicationModal)
 
+        main_layout = QtWidgets.QVBoxLayout()
+
+        title_label = QtWidgets.QLabel("Шифр Плейфера", self)
+        title_label.setAlignment(QtCore.Qt.AlignCenter)
+        main_layout.addWidget(title_label)
+
+        separator = QtWidgets.QFrame()
+        separator.setFrameShape(QtWidgets.QFrame.HLine)
+        separator.setFrameShadow(QtWidgets.QFrame.Sunken)
+        main_layout.addWidget(separator)
+
         self.label = QtWidgets.QLabel("Исходный текст:", self)
-        self.label.setGeometry(20, 0, 100, 20)
+        main_layout.addWidget(self.label)
 
         self.textEdit = QtWidgets.QTextEdit(self)
-        self.textEdit.setGeometry(20, 20, 460, 80)
+        main_layout.addWidget(self.textEdit)
 
         self.keyLabel = QtWidgets.QLabel("Ключ (текст):", self)
-        self.keyLabel.setGeometry(20, 200, 250, 20)
+        main_layout.addWidget(self.keyLabel)
 
         self.keyEdit = QtWidgets.QLineEdit(self)
-        self.keyEdit.setGeometry(20, 220, 460, 30)
         self.keyEdit.setValidator(QtGui.QRegExpValidator(QtCore.QRegExp("[a-zA-Zа-яА-Я0-9]+")))
+        main_layout.addWidget(self.keyEdit)
 
         self.resultLabel = QtWidgets.QLabel("Результат:", self)
-        self.resultLabel.setGeometry(20, 100, 100, 20)
+        main_layout.addWidget(self.resultLabel)
 
         self.textBrowser = QtWidgets.QTextBrowser(self)
-        self.textBrowser.setGeometry(20, 120, 460, 80)
+        main_layout.addWidget(self.textBrowser)
+
+        button_layout = QtWidgets.QHBoxLayout()
+
+        button_layout.addStretch(1)
 
         self.encryptButton = QtWidgets.QPushButton("Шифровать", self)
-        self.encryptButton.setGeometry(100, 270, 100, 30)
         self.encryptButton.clicked.connect(self.encrypt_text)
-
+        button_layout.addWidget(self.encryptButton)
+        button_layout.addSpacing(20)
         self.decryptButton = QtWidgets.QPushButton("Расшифровать", self)
-        self.decryptButton.setGeometry(210, 270, 100, 30)
         self.decryptButton.clicked.connect(self.decrypt_text)
-
+        button_layout.addWidget(self.decryptButton)
+        button_layout.addSpacing(20)
         self.clearButton = QtWidgets.QPushButton("Очистить", self)
-        self.clearButton.setGeometry(320, 270, 100, 30)
         self.clearButton.clicked.connect(self.clear_text)
+        button_layout.addWidget(self.clearButton)
+
+        button_layout.addStretch(1)
+
+        main_layout.addLayout(button_layout)
+
+        self.setLayout(main_layout)
 
     def show_error(self, message):
         msg = QtWidgets.QMessageBox()
@@ -98,7 +119,6 @@ class PlayfairCipherDialog(QtWidgets.QDialog):
                 result.append(matrix[row2][col1])
         
         return "".join(result)
-
 
     def encrypt_text(self):
         text = self.textEdit.toPlainText()
