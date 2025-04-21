@@ -365,11 +365,3 @@ class FrequencyAnalysisDialog(QtWidgets.QDialog):
                 QtWidgets.QMessageBox.information(self, "Успех", "Текст успешно сохранен!")
             except Exception as e:
                 QtWidgets.QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить файл: {str(e)}")
-
-
-if __name__ == "__main__":
-    import sys
-    app = QtWidgets.QApplication(sys.argv)
-    dialog = FrequencyAnalysisDialog()
-    dialog.show()
-    sys.exit(app.exec_())

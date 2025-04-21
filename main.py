@@ -9,6 +9,7 @@ from vizh import VigenereCipherDialog
 from pleiph import PlayfairCipherDialog
 from CKA import FrequencyAnalysisDialog
 from gam import GammaCipherDialog
+from des import DesCipherDialog
 
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
@@ -59,6 +60,14 @@ class MainWindow(QtWidgets.QMainWindow):
         cipher_buttons_layout2.addWidget(self.PleiphButton)
 
         main_layout.addLayout(cipher_buttons_layout2)
+
+        cipher_buttons_layout3 = QtWidgets.QHBoxLayout()
+
+        self.DESButton = QtWidgets.QPushButton("DES", self)
+        self.DESButton.clicked.connect(self.open_des)
+        cipher_buttons_layout3.addWidget(self.DESButton)
+
+        main_layout.addLayout(cipher_buttons_layout3)
 
         self.label2 = QtWidgets.QLabel("Выберите инструмент:", self)
         self.label2.setAlignment(QtCore.Qt.AlignCenter)
@@ -112,6 +121,10 @@ class MainWindow(QtWidgets.QMainWindow):
     def open_gam(self):
         self.gam_dialog = GammaCipherDialog()
         self.gam_dialog.exec_()
+
+    def open_des(self):
+        self.des_dialog = DesCipherDialog()
+        self.des_dialog.exec_()
 
 
 if __name__ == "__main__":
