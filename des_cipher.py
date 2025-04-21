@@ -137,12 +137,7 @@ def decrypt(enc_bits, key):
     return byte_data.rstrip(b' ').decode('utf-8', errors='ignore')
 
 
-def encrypt_bytes(data: bytes, seed, a, c, m):
-    lcg = LinearCongruentialGenerator(seed=seed, a=a, c=c, m=m)
-    key_bytes = lcg.generate(7)
-    key56 = [int(b) for byte in key_bytes for b in format(byte, '08b')][:56]
-    key = add_parity_bits(key56)
-
+def encrypt_bytes_with_key(data: bytes, key):
     keys = generate_keys(key)
     padded_data = data + b'\x00' * ((8 - len(data) % 8) % 8)
 
@@ -152,7 +147,7 @@ def encrypt_bytes(data: bytes, seed, a, c, m):
         bits = [int(b) for byte in block for b in format(byte, '08b')]
         encrypted_bits.extend(des_block_encrypt(bits, keys))
 
-    return encrypted_bits, key
+    return encrypted_bits
 
 def decrypt_bytes(enc_bits, key):
     keys = generate_keys(key)

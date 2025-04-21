@@ -1,7 +1,7 @@
 from PyQt5 import QtWidgets, QtCore
 from PyQt5.QtGui import QIcon
 import base64
-from des_cipher import decrypt, decrypt_bytes, encrypt_bytes, generate_des_key, encrypt_with_key
+from des_cipher import decrypt, decrypt_bytes, encrypt_bytes_with_key, generate_des_key, encrypt_with_key
 from gam import LCGSettingsDialog
 
 class DesCipherDialog(QtWidgets.QDialog):
@@ -158,15 +158,24 @@ class DesCipherDialog(QtWidgets.QDialog):
 
         with open(path, "rb") as f:
             data = f.read()
-        self.encrypted_bits, self.generated_key = encrypt_bytes(data, self.lcg_seed, self.lcg_a, self.lcg_c, self.lcg_m)
 
+        if self.manualKeyCheckbox.isChecked():
+            key_string = self.keyTextBrowser.toPlainText().strip()
+            try:
+                key = self.validate_key(key_string)
+            except ValueError as ve:
+                self.show_error(str(ve))
+                return
+        else:
+            key = generate_des_key(self.lcg_seed, self.lcg_a, self.lcg_c, self.lcg_m)
+            self.keyTextBrowser.setPlainText(''.join(map(str, key)))
+
+        encrypted_bits = encrypt_bytes_with_key(data, key)
         save_path, _ = QtWidgets.QFileDialog.getSaveFileName(self, "Сохранить зашифрованный файл", filter="*.enc")
         if save_path:
             with open(save_path, "wb") as f:
-                f.write(bytes(self.encrypted_bits))
-
+                f.write(bytes(encrypted_bits))
             QtWidgets.QMessageBox.information(self, "Успех", "Файл успешно зашифрован.")
-            self.keyTextBrowser.setPlainText(''.join(map(str, self.generated_key)))
 
     def decrypt_file(self):
         path, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Выберите зашифрованный файл")
@@ -178,14 +187,14 @@ class DesCipherDialog(QtWidgets.QDialog):
             self.show_error("Введите ключ для расшифровки.")
             return
 
-        with open(path, "rb") as f:
-            encrypted_bits = list(f.read())
-
         try:
             key = self.validate_key(key_string)
         except ValueError as ve:
             self.show_error(str(ve))
             return
+
+        with open(path, "rb") as f:
+            encrypted_bits = list(f.read())
 
         try:
             decrypted_bytes = decrypt_bytes(encrypted_bits, key)
@@ -196,3 +205,4 @@ class DesCipherDialog(QtWidgets.QDialog):
                 QtWidgets.QMessageBox.information(self, "Успех", "Файл успешно расшифрован.")
         except Exception as e:
             self.show_error(f"Ошибка при расшифровке: {e}")
+
