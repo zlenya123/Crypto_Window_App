@@ -121,7 +121,13 @@ class DesCipherDialog(QtWidgets.QDialog):
             key = generate_des_key(self.lcg_seed, self.lcg_a, self.lcg_c, self.lcg_m)
             self.keyTextBrowser.setPlainText(''.join(map(str, key)))
         self.encrypted_bits = encrypt_with_key(text, key)
-        self.textBrowser.setPlainText(base64.b64encode(bytes(self.encrypted_bits)).decode('utf-8'))
+        byte_array = bytearray()
+        for i in range(0, len(self.encrypted_bits), 8):
+            byte = 0
+            for bit in self.encrypted_bits[i:i+8]:
+                byte = (byte << 1) | bit
+            byte_array.append(byte)
+        self.textBrowser.setPlainText(base64.b64encode(bytes(byte_array)).decode('utf-8'))
 
 
     def decrypt_text(self):
@@ -133,7 +139,11 @@ class DesCipherDialog(QtWidgets.QDialog):
             return
         
         try:
-            encrypted_bits = list(map(int, base64.b64decode(encrypted_base64)))
+            decoded_bytes = base64.b64decode(encrypted_base64)
+            encrypted_bits = []
+            for byte in decoded_bytes:
+                for i in range(7, -1, -1):
+                    encrypted_bits.append((byte >> i) & 1)
             try:
                 key = self.validate_key(key_string)
             except ValueError as ve:
