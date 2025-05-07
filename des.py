@@ -1,7 +1,7 @@
 from PyQt5 import QtWidgets, QtCore
 from PyQt5.QtGui import QIcon
 import base64
-from des_cipher import decrypt, decrypt_bytes, encrypt_bytes_with_key, generate_des_key, encrypt_with_key
+from des_cipher import encrypt_bytes_with_key, decrypt_bytes, generate_des_key
 from gam import LCGSettingsDialog
 
 class DesCipherDialog(QtWidgets.QDialog):
@@ -11,35 +11,32 @@ class DesCipherDialog(QtWidgets.QDialog):
         self.setWindowTitle("DES Шифрование")
         self.resize(500, 400)
         self.setWindowModality(QtCore.Qt.ApplicationModal)
-        self.generated_key = None
-        self.encrypted_bits = None
         self.lcg_seed = 1
         self.lcg_a = 1664525
         self.lcg_c = 1013904223
         self.lcg_m = 2**32
-        
+
         layout = QtWidgets.QVBoxLayout()
+
         title = QtWidgets.QLabel("DES")
         title.setAlignment(QtCore.Qt.AlignCenter)
         layout.addWidget(title)
-        separator = QtWidgets.QFrame()
-        separator.setFrameShape(QtWidgets.QFrame.HLine)
-        separator.setFrameShadow(QtWidgets.QFrame.Sunken)
-        layout.addWidget(separator)
-        
-        self.configureLCGButton = QtWidgets.QPushButton("Настроить ЛКГ", self)
+        layout.addWidget(self._separator())
+
+        self.configureLCGButton = QtWidgets.QPushButton("Настроить ЛКГ")
         self.configureLCGButton.clicked.connect(self.configure_lcg)
         layout.addWidget(self.configureLCGButton)
-        
+
         self.textEdit = QtWidgets.QTextEdit()
         layout.addWidget(QtWidgets.QLabel("Текст:"))
         layout.addWidget(self.textEdit)
-        
+
         self.keyLabel = QtWidgets.QLabel("Ключ:")
         layout.addWidget(self.keyLabel)
         self.keyTextBrowser = QtWidgets.QTextEdit()
+        self.keyTextBrowser.setReadOnly(True)
         layout.addWidget(self.keyTextBrowser)
-        
+
         self.manualKeyCheckbox = QtWidgets.QCheckBox("Ввести ключ вручную")
         self.manualKeyCheckbox.stateChanged.connect(self.toggle_key_input)
         layout.addWidget(self.manualKeyCheckbox)
@@ -47,30 +44,41 @@ class DesCipherDialog(QtWidgets.QDialog):
         self.generateKeyButton = QtWidgets.QPushButton("Сгенерировать ключ")
         self.generateKeyButton.clicked.connect(self.generate_random_key)
         layout.addWidget(self.generateKeyButton)
-        self.keyTextBrowser.setReadOnly(True)
 
         self.textBrowser = QtWidgets.QTextBrowser()
         layout.addWidget(QtWidgets.QLabel("Результат:"))
         layout.addWidget(self.textBrowser)
-        
+
         button_layout = QtWidgets.QHBoxLayout()
         self.encryptButton = QtWidgets.QPushButton("Зашифровать")
         self.encryptButton.clicked.connect(self.encrypt_text)
         button_layout.addWidget(self.encryptButton)
+
         self.decryptButton = QtWidgets.QPushButton("Расшифровать")
         self.decryptButton.clicked.connect(self.decrypt_text)
         button_layout.addWidget(self.decryptButton)
+
         self.clearButton = QtWidgets.QPushButton("Очистить")
         self.clearButton.clicked.connect(self.clear_all)
         button_layout.addWidget(self.clearButton)
+
         layout.addLayout(button_layout)
+
         self.encryptFileButton = QtWidgets.QPushButton("Зашифровать файл")
         self.encryptFileButton.clicked.connect(self.encrypt_file)
         layout.addWidget(self.encryptFileButton)
+
         self.decryptFileButton = QtWidgets.QPushButton("Расшифровать файл")
         self.decryptFileButton.clicked.connect(self.decrypt_file)
         layout.addWidget(self.decryptFileButton)
+
         self.setLayout(layout)
+
+    def _separator(self):
+        separator = QtWidgets.QFrame()
+        separator.setFrameShape(QtWidgets.QFrame.HLine)
+        separator.setFrameShadow(QtWidgets.QFrame.Sunken)
+        return separator
 
     def toggle_key_input(self, state):
         self.keyTextBrowser.setReadOnly(not bool(state))
@@ -79,13 +87,8 @@ class DesCipherDialog(QtWidgets.QDialog):
         key = generate_des_key(self.lcg_seed, self.lcg_a, self.lcg_c, self.lcg_m)
         self.keyTextBrowser.setPlainText(''.join(map(str, key)))
 
-
     def show_error(self, message):
-        msg = QtWidgets.QMessageBox(self)
-        msg.setIcon(QtWidgets.QMessageBox.Critical)
-        msg.setWindowTitle("Ошибка")
-        msg.setText(message)
-        msg.exec_()
+        QtWidgets.QMessageBox.critical(self, "Ошибка", message)
 
     def configure_lcg(self):
         dialog = LCGSettingsDialog(self)
@@ -97,122 +100,79 @@ class DesCipherDialog(QtWidgets.QDialog):
             self.lcg_seed, self.lcg_a, self.lcg_c, self.lcg_m = dialog.get_settings()
 
     def validate_key(self, key_string):
-        if not all(c in '01' for c in key_string):
-            raise ValueError("Ключ должен содержать только 0 и 1.")
-        if len(key_string) != 64:
-            raise ValueError("Ключ должен состоять из 64 бит (включая биты чётности).")
+        if not all(c in '01' for c in key_string) or len(key_string) != 64:
+            raise ValueError("Ключ должен состоять из 64 бит (0 и 1).")
         return list(map(int, key_string))
 
+    def get_key(self):
+        if self.manualKeyCheckbox.isChecked():
+            key_string = self.keyTextBrowser.toPlainText().strip()
+            return self.validate_key(key_string)
+        else:
+            key = generate_des_key(self.lcg_seed, self.lcg_a, self.lcg_c, self.lcg_m)
+            self.keyTextBrowser.setPlainText(''.join(map(str, key)))
+            return key
 
     def encrypt_text(self):
         text = self.textEdit.toPlainText()
         if not text:
             self.show_error("Введите текст для шифрования.")
             return
-
-        if self.manualKeyCheckbox.isChecked():
-            key_string = self.keyTextBrowser.toPlainText().strip()
-            try:
-                key = self.validate_key(key_string)
-            except ValueError as ve:
-                self.show_error(str(ve))
-                return
-        else:
-            key = generate_des_key(self.lcg_seed, self.lcg_a, self.lcg_c, self.lcg_m)
-            self.keyTextBrowser.setPlainText(''.join(map(str, key)))
-        self.encrypted_bits = encrypt_with_key(text, key)
-        byte_array = bytearray()
-        for i in range(0, len(self.encrypted_bits), 8):
-            byte = 0
-            for bit in self.encrypted_bits[i:i+8]:
-                byte = (byte << 1) | bit
-            byte_array.append(byte)
-        self.textBrowser.setPlainText(base64.b64encode(bytes(byte_array)).decode('utf-8'))
-
+        try:
+            key = self.get_key()
+            encrypted = encrypt_bytes_with_key(text.encode('utf-8'), key)
+            self.textBrowser.setPlainText(base64.b64encode(encrypted).decode('utf-8'))
+        except Exception as e:
+            self.show_error(f"Ошибка при шифровании: {e}")
 
     def decrypt_text(self):
         encrypted_base64 = self.textEdit.toPlainText().strip()
-        key_string = self.keyTextBrowser.toPlainText().strip()
-        
-        if not encrypted_base64 or not key_string:
-            self.show_error("Нет данных для расшифровки. Введите зашифрованные данные и ключ.")
+        if not encrypted_base64:
+            self.show_error("Введите зашифрованный текст.")
             return
-        
         try:
-            decoded_bytes = base64.b64decode(encrypted_base64)
-            encrypted_bits = []
-            for byte in decoded_bytes:
-                for i in range(7, -1, -1):
-                    encrypted_bits.append((byte >> i) & 1)
-            try:
-                key = self.validate_key(key_string)
-            except ValueError as ve:
-                self.show_error(str(ve))
-                return
-            decrypted = decrypt(encrypted_bits, key)
-            self.textBrowser.setPlainText(decrypted)
+            key = self.get_key()
+            encrypted_bytes = base64.b64decode(encrypted_base64)
+            decrypted = decrypt_bytes(encrypted_bytes, key)
+            self.textBrowser.setPlainText(decrypted.decode('utf-8', errors='ignore'))
         except Exception as e:
-            self.show_error(f"Произошла ошибка при расшифровке: {str(e)}")
+            self.show_error(f"Ошибка при расшифровке: {e}")
 
     def clear_all(self):
         self.textEdit.clear()
         self.textBrowser.clear()
         self.keyTextBrowser.clear()
-        self.encrypted_bits = None
-        self.generated_key = None
 
     def encrypt_file(self):
         path, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Выберите файл для шифрования")
         if not path:
             return
-
-        with open(path, "rb") as f:
-            data = f.read()
-
-        if self.manualKeyCheckbox.isChecked():
-            key_string = self.keyTextBrowser.toPlainText().strip()
-            try:
-                key = self.validate_key(key_string)
-            except ValueError as ve:
-                self.show_error(str(ve))
-                return
-        else:
-            key = generate_des_key(self.lcg_seed, self.lcg_a, self.lcg_c, self.lcg_m)
-            self.keyTextBrowser.setPlainText(''.join(map(str, key)))
-
-        encrypted_bits = encrypt_bytes_with_key(data, key)
-        save_path, _ = QtWidgets.QFileDialog.getSaveFileName(self, "Сохранить зашифрованный файл", filter="*.enc")
-        if save_path:
-            with open(save_path, "wb") as f:
-                f.write(bytes(encrypted_bits))
-            QtWidgets.QMessageBox.information(self, "Успех", "Файл успешно зашифрован.")
+        try:
+            with open(path, "rb") as f:
+                data = f.read()
+            key = self.get_key()
+            encrypted_data = encrypt_bytes_with_key(data, key)
+            save_path, _ = QtWidgets.QFileDialog.getSaveFileName(self, "Сохранить зашифрованный файл", filter="*.enc")
+            if save_path:
+                with open(save_path, "wb") as f:
+                    f.write(encrypted_data)
+                QtWidgets.QMessageBox.information(self, "Успех", "Файл успешно зашифрован.")
+        except Exception as e:
+            self.show_error(f"Ошибка при шифровании файла: {e}")
 
     def decrypt_file(self):
         path, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Выберите зашифрованный файл")
         if not path:
             return
-
-        key_string = self.keyTextBrowser.toPlainText().strip()
-        if not key_string:
-            self.show_error("Введите ключ для расшифровки.")
-            return
-
         try:
-            key = self.validate_key(key_string)
-        except ValueError as ve:
-            self.show_error(str(ve))
-            return
-
-        with open(path, "rb") as f:
-            encrypted_bits = list(f.read())
-
-        try:
-            decrypted_bytes = decrypt_bytes(encrypted_bits, key)
+            with open(path, "rb") as f:
+                encrypted_data = f.read()
+            key = self.get_key()
+            decrypted_data = decrypt_bytes(encrypted_data, key)
             save_path, _ = QtWidgets.QFileDialog.getSaveFileName(self, "Сохранить расшифрованный файл")
             if save_path:
                 with open(save_path, "wb") as f:
-                    f.write(decrypted_bytes)
+                    f.write(decrypted_data)
                 QtWidgets.QMessageBox.information(self, "Успех", "Файл успешно расшифрован.")
         except Exception as e:
-            self.show_error(f"Ошибка при расшифровке: {e}")
-
+            self.show_error(f"Ошибка при расшифровке файла: {e}")

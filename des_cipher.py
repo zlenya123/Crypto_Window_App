@@ -1,3 +1,4 @@
+import numpy as np
 from gam import LinearCongruentialGenerator
 
 IP = [58, 50, 42, 34, 26, 18, 10, 2,
@@ -67,115 +68,97 @@ S_BOX = [[[14, 4, 13, 1, 2, 15, 11, 8, 3, 10, 6, 12, 5, 9, 0, 7], [0, 15, 7, 4, 
                 [[13, 2, 8, 4, 6, 15, 11, 1, 10, 9, 3, 14, 5, 0, 12, 7], [1, 15, 13, 8, 10, 3, 7, 4, 12, 5, 6, 11, 0, 14, 9, 2], [7, 11, 4, 1, 9, 12, 14, 2, 0, 6, 10, 13, 15, 3, 5, 8], [2, 1, 14, 7, 4, 10, 8, 13, 15, 12, 9, 0, 3, 5, 6, 11 ]]]
 
 
+def pad_pkcs5(data: bytes, block_size: int = 8) -> bytes:
+    padding_len = block_size - (len(data) % block_size)
+    return data + bytes([padding_len] * padding_len)
+
+def unpad_pkcs5(padded: bytes) -> bytes:
+    padding_len = padded[-1]
+    if padding_len < 1 or padding_len > 8:
+        raise ValueError('Некорректный паддинг')
+    return padded[:-padding_len]
+
 def permute(bits, table):
-    return [bits[x-1] for x in table]
+    return [bits[i - 1] for i in table]
 
 def xor(bits1, bits2):
-    return [b1 ^ b2 for b1, b2 in zip(bits1, bits2)]
+    return np.bitwise_xor(bits1, bits2)
 
 def shift_left(bits, n):
-    return bits[n:] + bits[:n]
+    return np.roll(bits, -n)
 
 def add_parity_bits(key56bits):
     key_with_parity = []
     for i in range(0, 56, 7):
         block = key56bits[i:i+7]
-        parity_bit = 0 if sum(block) % 2 else 1
-        key_with_parity.extend(block + [parity_bit])
-    return key_with_parity
-
+        parity_bit = np.uint8(0 if np.sum(block) % 2 else 1)
+        key_with_parity.extend(block.tolist() + [parity_bit])
+    return np.array(key_with_parity, dtype=np.uint8)
 
 def generate_keys(key64):
     key56 = permute(key64, PC1)
     C, D = key56[:28], key56[28:]
     keys = []
     for shift in SHIFT_SCHEDULE:
-        C, D = shift_left(C, shift), shift_left(D, shift)
-        keys.append(permute(C + D, PC2))
+        C = shift_left(C, shift)
+        D = shift_left(D, shift)
+        keys.append(permute(np.concatenate((C, D)), PC2))
     return keys
 
 def sbox_substitution(bits):
     result = []
     for i in range(8):
         block = bits[i*6:(i+1)*6]
-        row = int(f"{block[0]}{block[5]}", 2)
-        col = int(''.join(map(str, block[1:5])), 2)
+        row = (block[0] << 1) | block[5]
+        col = (block[1] << 3) | (block[2] << 2) | (block[3] << 1) | block[4]
         val = S_BOX[i][row][col]
-        result.extend([int(x) for x in format(val, '04b')])
-    return result
+        result.extend([int(b) for b in format(val, '04b')])
+    return np.array(result, dtype=np.uint8)
 
 def f(R, K):
-    expanded = permute(R, E)
-    tmp = xor(expanded, K)
-    return permute(sbox_substitution(tmp), P)
+    return permute(sbox_substitution(xor(permute(R, E), K)), P)
 
 def des_round(L, R, K):
-    newL = R
-    newR = xor(L, f(R, K))
-    return newL, newR
+    return R, xor(L, f(R, K))
 
 def des_block_encrypt(block64, keys):
     block = permute(block64, IP)
     L, R = block[:32], block[32:]
     for K in keys:
         L, R = des_round(L, R, K)
-    return permute(R + L, IP_INV)
+    return permute(np.concatenate((R, L)), IP_INV)
 
 def des_block_decrypt(block64, keys):
     return des_block_encrypt(block64, keys[::-1])
 
-def decrypt(enc_bits, key):
-    keys = generate_keys(key)
-    decrypted_bits = []
-    
-    for i in range(0, len(enc_bits), 64):
-        block = enc_bits[i:i+64]
-        dec_bits = des_block_decrypt(block, keys)
-        decrypted_bits.extend(dec_bits)
-    
-    byte_data = bytes(int(''.join(map(str, decrypted_bits[i:i+8])), 2) for i in range(0, len(decrypted_bits), 8))
-    return byte_data.rstrip(b' ').decode('utf-8', errors='ignore')
-
-
 def encrypt_bytes_with_key(data: bytes, key):
     keys = generate_keys(key)
-    padded_data = data + b'\x00' * ((8 - len(data) % 8) % 8)
+    data = pad_pkcs5(data)
+    bits = np.unpackbits(np.frombuffer(data, dtype=np.uint8))
+    encrypted = []
+    for i in range(0, len(bits), 64):
+        block = bits[i:i+64]
+        encrypted_block = des_block_encrypt(block, keys)
+        encrypted.append(encrypted_block)
+    encrypted_bits = np.concatenate(encrypted)
+    return np.packbits(encrypted_bits).tobytes()
 
-    encrypted_bits = []
-    for i in range(0, len(padded_data), 8):
-        block = padded_data[i:i+8]
-        bits = [int(b) for byte in block for b in format(byte, '08b')]
-        encrypted_bits.extend(des_block_encrypt(bits, keys))
-
-    return encrypted_bits
-
-def decrypt_bytes(enc_bits, key):
+def decrypt_bytes(enc_data: bytes, key):
     keys = generate_keys(key)
-    decrypted_bits = []
-    for i in range(0, len(enc_bits), 64):
-        block = enc_bits[i:i+64]
-        decrypted_bits.extend(des_block_decrypt(block, keys))
-    decrypted_bytes = bytes(int(''.join(map(str, decrypted_bits[i:i+8])), 2) for i in range(0, len(decrypted_bits), 8))
-    return decrypted_bytes.rstrip(b'\x00')
-
+    bits = np.unpackbits(np.frombuffer(enc_data, dtype=np.uint8))
+    decrypted = []
+    for i in range(0, len(bits), 64):
+        block = bits[i:i+64]
+        decrypted_block = des_block_decrypt(block, keys)
+        decrypted.append(decrypted_block)
+    decrypted_bits = np.concatenate(decrypted)
+    decrypted_bytes = np.packbits(decrypted_bits).tobytes()
+    return unpad_pkcs5(decrypted_bytes)
 
 def generate_des_key(seed, a, c, m):
     lcg = LinearCongruentialGenerator(seed=seed, a=a, c=c, m=m)
     key56 = []
     for byte in lcg.generate(7):
-        key56.extend([int(bit) for bit in format(byte, '08b')])
+        key56.extend([int(b) for b in format(byte, '08b')])
     key56 = key56[:56]
-    return add_parity_bits(key56)
-
-def encrypt_with_key(plaintext, key):
-    keys = generate_keys(key)
-    data = plaintext.encode('utf-8')
-    padded_data = data + b' ' * ((8 - len(data) % 8) % 8)
-
-    encrypted_bits = []
-    for i in range(0, len(padded_data), 8):
-        block = padded_data[i:i+8]
-        bits = [int(bit) for byte in block for bit in format(byte, '08b')]
-        enc_bits = des_block_encrypt(bits, keys)
-        encrypted_bits.extend(enc_bits)
-    return encrypted_bits
+    return add_parity_bits(np.array(key56, dtype=np.uint8))
